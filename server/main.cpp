@@ -2,26 +2,44 @@
 #include <thread>
 #include <chrono>
 #include <iostream>
+#include <fstream>
 
-struct MySession : Session
+struct WriteFileSession : Session
 {
-  explicit MySession(const Session::Engine& engine) :
+  explicit WriteFileSession(const Session::Engine& engine) :
     Session(engine), bytesReceived(0)
-  {}
+  {
+    m_fileStream.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    m_fileStream.open("./client", std::ofstream::out | std::ofstream::trunc);
+
+    if(!m_fileStream.is_open())
+    {
+      throw std::runtime_error("Unable to open file");
+    }
+  }
+
   virtual void onDataReceived(Data& inputBuffer)
   {
     bytesReceived += inputBuffer.size();
-    inputBuffer.clear();
+    m_fileStream.write(inputBuffer.data(), inputBuffer.size());
+    m_fileStream.flush();
 
-    std::cout << "bytesReceived = " << bytesReceived << std::endl;
+    inputBuffer.clear();
   }
-  private:
-    uint64_t bytesReceived;
+
+  ~WriteFileSession()
+  {
+    m_fileStream.close();
+  }
+
+private:
+  std::ofstream m_fileStream;
+  uint64_t bytesReceived;
 };
 
 const PointerToSession createSession(const Session::Engine& engine)
 {
-  return std::make_shared<MySession>(engine);
+  return std::make_shared<WriteFileSession>(engine);
 }
 
 int main()
