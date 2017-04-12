@@ -1,3 +1,5 @@
+#include <dto/Serializer.h>
+#include <experimental/filesystem>
 #include <asio.hpp>
 #include <unistd.h>
 #include <stdexcept>
@@ -68,8 +70,17 @@ namespace
       throw std::runtime_error("Can't open the source file: " + sourceFilename);
     }
 
+    const std::experimental::filesystem::path path(sourceFilename);
+    FileServer::Messages::CreateFile messaage;
+    messaage.set_path(std::experimental::filesystem::canonical(path).string());
+    messaage.set_size(sourceFile.tellg());
+
+    std::vector<char> header;
+    Serialization::serializeDelimited(messaage, header);
+    socket.write_some(asio::buffer(header.data(), header.size()));
+
     sourceFile.seekg(0);
-    std::vector<char> dataChunk(1024,0);
+    std::vector<char> dataChunk(1500,0);
 
     while(!sourceFile.eof())
     {

@@ -31,13 +31,13 @@ public:
 
 protected:
   explicit Session(const Engine& essence);
+  void close();
 
 private:
   virtual void onDataReceived(Data& inputBuffer);
   virtual void onSocketError(const asio::error_code& error);
 
 private:
-  void close();
   void startReading(bool callHandlerImmediately = false);
   void invokeAsync(const AsyncOperation& operation);
 
