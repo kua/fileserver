@@ -2,10 +2,8 @@
 #define _Session_H_1D10ED4E_5A09_4373_AB33_32F415016CC8_INCLUDED_
 
 #include <asio.hpp>
-#include <functional>
 #include <memory>
 
-typedef std::function<void()> AsyncOperation;
 typedef std::vector<char> Data;
 
 class Session
@@ -27,7 +25,6 @@ public:
 
   void start();
   virtual ~Session() {}
-  void closeAsync();
 
 protected:
   explicit Session(const Engine& essence);
@@ -38,10 +35,8 @@ private:
   virtual void onSocketError(const asio::error_code& error);
 
 private:
-  void startReading(bool callHandlerImmediately = false);
-  void invokeAsync(const AsyncOperation& operation);
+  void startReading();
 
-  void handleAsyncOperation(const AsyncOperation& asyncOperation);
   void handleRead(const asio::error_code& error, const size_t bytesTransferred);
   void handleSocketError(const asio::error_code& error);
 
@@ -50,7 +45,6 @@ private:
 
   Engine m_engine;
   Data m_inputBuffer;
-  bool m_isAsyncReadInProgress;
 };
 
 typedef std::shared_ptr<Session> PointerToSession;

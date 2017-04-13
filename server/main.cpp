@@ -4,13 +4,13 @@
 #include <experimental/filesystem>
 #include <thread>
 #include <chrono>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 struct WriteFileSession : Session
 {
   explicit WriteFileSession(const Session::Engine& engine, const std::experimental::filesystem::path& serverFilesFolder) :
-    Session(engine), m_basePath(serverFilesFolder), m_isInit(false), m_totalFileSize(0)
+    Session(engine), m_basePath(serverFilesFolder), m_isInit(false), m_totalFileSize(0), m_bytesReceived(0)
   {
   }
 
@@ -19,19 +19,40 @@ struct WriteFileSession : Session
     return m_isInit;
   }
 
+  bool isOver() const
+  {
+    return m_totalFileSize <= m_bytesReceived;
+  }
+
   void onDataReceived(Data& inputBuffer) override
   {
     if(!isInit())
     {
       parseMetaInfo(inputBuffer);
     }
-    else
+
+    if(!inputBuffer.empty())
     {
-      m_fileStream.write(inputBuffer.data(), inputBuffer.size());
-      m_fileStream.flush();
+      writeDataChunk(inputBuffer);
 
       inputBuffer.clear();
+
+      if(isOver())
+        close();
     }
+  }
+
+  void writeDataChunk(Data& inputBuffer)
+  try
+  {
+    m_fileStream.write(inputBuffer.data(), inputBuffer.size());
+    m_fileStream.flush();
+    m_bytesReceived += inputBuffer.size();
+  }
+  catch (std::exception& ex)
+  {
+    std::cerr << "an exception occured in WriteFileSession while writing data to file: " << ex.what();
+    close();
   }
 
   void parseMetaInfo(Data& inputBuffer)
@@ -47,21 +68,20 @@ struct WriteFileSession : Session
 
       if(!bytesConsumed)
       {
-        inputBuffer.clear();
-        return;
+        throw std::runtime_error("bytesConsumed should be greater than 0 after successful metadata message parsing");
       }
 
       inputBuffer.erase(inputBuffer.begin(), inputBuffer.begin() + bytesConsumed);
 
       const std::experimental::filesystem::path receivedFilePath(message->path());
-      const std::experimental::filesystem::path serverFilePath(m_basePath / receivedFilePath);
+      m_filePath = m_basePath / receivedFilePath;
 
-      std::experimental::filesystem::create_directories(serverFilePath.parent_path());
+      std::experimental::filesystem::create_directories(m_filePath.parent_path());
 
-      std::cout << "start writing file " << serverFilePath << std::endl;
+      std::cout << "start writing file " << m_filePath << std::endl;
 
       m_fileStream.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-      m_fileStream.open(serverFilePath.string(), std::ofstream::out | std::ofstream::trunc);
+      m_fileStream.open(m_filePath.string(), std::ofstream::out | std::ofstream::trunc);
 
       if(!m_fileStream.is_open())
         throw std::runtime_error("unable to open target file for writing");
@@ -72,20 +92,27 @@ struct WriteFileSession : Session
   }
   catch (std::exception& ex)
   {
-    std::cerr << "an exception occured in WriteFileSession: " << ex.what();
+    std::cerr << "an exception occured in WriteFileSession while file creating: " << ex.what();
     close();
   }
 
   ~WriteFileSession()
   {
     m_fileStream.close();
+
+    if(!isOver() && !m_filePath.empty())
+    {
+      std::experimental::filesystem::remove_all(m_filePath);
+    }
   }
 
 private:
   const std::experimental::filesystem::path m_basePath;
+  std::experimental::filesystem::path m_filePath;
   bool m_isInit;
   std::ofstream m_fileStream;
   uint64_t m_totalFileSize;
+  uint64_t m_bytesReceived;
 };
 
 const PointerToSession createSession(const Session::Engine& engine, const std::experimental::filesystem::path& serverFilesFolder)
@@ -103,6 +130,6 @@ int main()
 
   networkService.listen(ep, std::bind(&createSession, std::placeholders::_1, serverFilesFolder));
 
-  for (;;)
+  while(!networkService.isWantedToDie())
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }

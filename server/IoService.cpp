@@ -47,12 +47,16 @@ struct IoService::Impl
   Impl(const size_t workerThreadCount)
   try
     : m_dummyWork(new asio::io_service::work(m_ioService))
+    , m_signalSet(m_ioService, SIGINT, SIGTERM)
+    , m_wantToDie(false)
   {
     if (workerThreadCount == 0)
       throw std::invalid_argument("IoService: аргумент workerThreadCount не может быть равен нулю");
 
     for(size_t i = 0; i < workerThreadCount; ++i)
       m_workerThreads.emplace_back(std::bind(static_cast<std::size_t (asio::io_service::*)()>(&asio::io_service::run), &m_ioService));
+
+    m_signalSet.async_wait(std::bind(&IoService::Impl::wantToDie, this));
   }
   catch(const std::exception&)
   {
@@ -61,10 +65,17 @@ struct IoService::Impl
     throw std::invalid_argument(what.str());
   }
 
+  void wantToDie()
+  {
+    m_wantToDie = true;
+  }
+
   asio::io_service m_ioService;
   std::unique_ptr<asio::io_service::work> m_dummyWork;
   std::vector<std::thread> m_workerThreads;
   std::vector<std::shared_ptr<asio::ip::tcp::acceptor>> m_acceptors;
+  asio::signal_set m_signalSet;
+  std::atomic<bool> m_wantToDie;
 };
 
 IoService::IoService(const size_t workerThreadCount)
@@ -89,3 +100,9 @@ void IoService::listen(const asio::ip::tcp::endpoint& listenEndpoint, const Crea
 
   startAccept(*acceptor, sessionCreator);
 }
+
+bool IoService::isWantedToDie() const
+{
+  return m_impl->m_wantToDie;
+}
+

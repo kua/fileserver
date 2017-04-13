@@ -35,7 +35,7 @@ namespace
       }
 
     if(endpoint.empty() || path.empty())
-      throw std::invalid_argument("incorrect launch parameters specified");
+      throw std::invalid_argument("incorrect launch parameters specified, usage example ./client -e 127.0.0.1:8080 -f ./client");
 
     return ProgramOptions{endpoint, path};
   }
@@ -73,7 +73,7 @@ namespace
     const std::experimental::filesystem::path path(sourceFilename);
     FileServer::Messages::CreateFile messaage;
     messaage.set_path(std::experimental::filesystem::canonical(path).string());
-    messaage.set_size(sourceFile.tellg());
+    messaage.set_size(std::experimental::filesystem::file_size(path));
 
     std::vector<char> header;
     Serialization::serializeDelimited(messaage, header);

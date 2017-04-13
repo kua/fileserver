@@ -14,7 +14,7 @@ public:
   explicit IoService(const size_t workerThreadCount);
   ~IoService();
   void listen(const asio::ip::tcp::endpoint& listenEndpoint, const CreateSessionFunction& sessionCreator, bool reuseAddress = true);
-
+  bool isWantedToDie() const;
 private:
   IoService(const IoService&) = delete;
   void operator=(const IoService&) = delete;
