@@ -51,7 +51,7 @@ struct IoService::Impl
     , m_wantToDie(false)
   {
     if (workerThreadCount == 0)
-      throw std::invalid_argument("IoService: аргумент workerThreadCount не может быть равен нулю");
+      throw std::invalid_argument("IoService: workerThreadCount can't be 0");
 
     for(size_t i = 0; i < workerThreadCount; ++i)
       m_workerThreads.emplace_back(std::bind(static_cast<std::size_t (asio::io_service::*)()>(&asio::io_service::run), &m_ioService));
@@ -61,7 +61,7 @@ struct IoService::Impl
   catch(const std::exception&)
   {
     std::ostringstream what;
-    what  << "Ошибка создания рабочих потоков, workerThreadCount=" << workerThreadCount;
+    what  << "Error creating worker threads, workerThreadCount=" << workerThreadCount;
     throw std::invalid_argument(what.str());
   }
 
