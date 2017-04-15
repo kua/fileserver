@@ -125,7 +125,7 @@ int main()
   const size_t preferredThreadsCount = std::thread::hardware_concurrency();
   IoService networkService(preferredThreadsCount);
 
-  const asio::ip::tcp::endpoint ep(asio::ip::address::from_string("127.0.0.1"), 8080);
+  const asio::ip::tcp::endpoint ep(asio::ip::address::from_string("0.0.0.0"), 8080);
   const std::experimental::filesystem::path serverFilesFolder = "/tmp";
 
   networkService.listen(ep, std::bind(&createSession, std::placeholders::_1, serverFilesFolder));
